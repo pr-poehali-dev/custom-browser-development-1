@@ -48,13 +48,67 @@ const Index = () => {
   const [showCookieWarning, setShowCookieWarning] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isDesktopMode, setIsDesktopMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('browser-history');
     if (savedHistory) {
       setHistory(JSON.parse(savedHistory));
     }
+    const savedDarkMode = localStorage.getItem('dark-mode');
+    if (savedDarkMode) {
+      setIsDarkMode(JSON.parse(savedDarkMode));
+    }
   }, []);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('dark-mode', JSON.stringify(isDarkMode));
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    if (searchQuery.trim() && searchQuery.includes('.')) {
+      const popularSites = [
+        'google.com',
+        'youtube.com',
+        'vk.com',
+        'yandex.ru',
+        'mail.ru',
+        'ok.ru',
+        'wikipedia.org',
+        'github.com',
+        'stackoverflow.com',
+        'habr.com'
+      ];
+      
+      const filtered = popularSites.filter(site => 
+        site.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      
+      const fromHistory = history
+        .map(item => {
+          try {
+            return new URL(item.url).hostname;
+          } catch {
+            return '';
+          }
+        })
+        .filter(domain => domain && domain.toLowerCase().includes(searchQuery.toLowerCase()))
+        .slice(0, 3);
+      
+      setSuggestions([...new Set([...filtered, ...fromHistory])].slice(0, 5));
+      setShowSuggestions(true);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [searchQuery, history]);
 
   useEffect(() => {
     if (currentUrl) {
@@ -84,21 +138,23 @@ const Index = () => {
     setIsSidebarOpen(false);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent, directUrl?: string) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    const query = directUrl || searchQuery;
+    if (!query.trim()) return;
 
-    let url = searchQuery;
+    let url = query;
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      if (url.includes('.') && !url.includes(' ')) {
-        url = 'https://' + url;
-      } else {
-        url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+      if (!url.includes('.') || url.includes(' ')) {
+        toast.error('Введите корректный URL адрес (например: google.com)');
+        return;
       }
+      url = 'https://' + url;
     }
 
     setCurrentUrl(url);
-    saveToHistory(url, searchQuery);
+    saveToHistory(url, query);
+    setShowSuggestions(false);
     
     const activeTabIndex = tabs.findIndex(t => t.isActive);
     const updatedTabs = [...tabs];
@@ -311,7 +367,7 @@ const Index = () => {
               </SheetContent>
             </Sheet>
 
-            <form onSubmit={handleSearch} className="flex-1">
+            <form onSubmit={handleSearch} className="flex-1 relative">
               <div className="relative">
                 <Icon 
                   name="Search" 
@@ -320,12 +376,32 @@ const Index = () => {
                 />
                 <Input
                   type="text"
-                  placeholder="Поиск или введите адрес"
+                  placeholder="Введите URL адрес (например: google.com)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => searchQuery && setShowSuggestions(true)}
                   className="pl-12 pr-4 h-12 rounded-full border-2 border-primary/20 focus:border-primary transition-colors text-base"
                 />
               </div>
+              {showSuggestions && suggestions.length > 0 && (
+                <Card className="absolute top-14 left-0 right-0 z-50 shadow-xl animate-fade-in">
+                  <ScrollArea className="max-h-60">
+                    {suggestions.map((site, index) => (
+                      <div
+                        key={index}
+                        onClick={(e) => {
+                          setSearchQuery(site);
+                          handleSearch(e, site);
+                        }}
+                        className="px-4 py-3 hover:bg-accent cursor-pointer transition-colors flex items-center gap-3 border-b last:border-b-0"
+                      >
+                        <Icon name="Globe" size={18} className="text-primary" />
+                        <span className="text-sm font-medium">{site}</span>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </Card>
+              )}
             </form>
 
             {currentUrl && (
@@ -351,6 +427,10 @@ const Index = () => {
                   <DropdownMenuItem onClick={() => setIsDesktopMode(!isDesktopMode)}>
                     <Icon name="Monitor" size={16} className="mr-2" />
                     {isDesktopMode ? 'Мобильная версия' : 'Версия для ПК'}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsDarkMode(!isDarkMode)}>
+                    <Icon name={isDarkMode ? 'Sun' : 'Moon'} size={16} className="mr-2" />
+                    {isDarkMode ? 'Светлый режим' : 'Тёмный режим'}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -441,10 +521,10 @@ const Index = () => {
                 <div className="mb-6 md:mb-8">
                   <Icon name="Compass" size={64} className="mx-auto text-white/90 mb-4 md:mb-6 md:w-20 md:h-20" />
                   <h1 className="text-2xl sm:text-3xl md:text-6xl font-bold text-white mb-3 md:mb-4 px-2">
-                    HimoBrowser@admin.com
+                    Himo браузер
                   </h1>
                   <p className="text-base md:text-xl text-white/80 px-4">
-                    Введите адрес сайта или поисковый запрос выше
+                    Введите URL адрес сайта выше
                   </p>
                 </div>
 
