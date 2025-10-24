@@ -6,6 +6,19 @@ import { Card } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface HistoryItem {
   id: string;
@@ -29,6 +42,11 @@ const Index = () => {
   ]);
   const [currentUrl, setCurrentUrl] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [calcDisplay, setCalcDisplay] = useState('0');
+  const [calcExpression, setCalcExpression] = useState('');
+  const [showCookieWarning, setShowCookieWarning] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('browser-history');
@@ -36,6 +54,15 @@ const Index = () => {
       setHistory(JSON.parse(savedHistory));
     }
   }, []);
+
+  useEffect(() => {
+    if (currentUrl) {
+      const timer = setTimeout(() => {
+        setShowCookieWarning(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentUrl]);
 
   const saveToHistory = (url: string, title: string) => {
     const newItem: HistoryItem = {
@@ -65,7 +92,7 @@ const Index = () => {
       if (url.includes('.') && !url.includes(' ')) {
         url = 'https://' + url;
       } else {
-        url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+        url = 'https://yandex.ru/search/?text=' + encodeURIComponent(url);
       }
     }
 
@@ -94,6 +121,7 @@ const Index = () => {
     setTabs(tabs.map(t => ({ ...t, isActive: false })).concat(newTab));
     setCurrentUrl('');
     setSearchQuery('');
+    setShowCookieWarning(false);
   };
 
   const closeTab = (id: string) => {
@@ -109,6 +137,7 @@ const Index = () => {
     }
     
     setTabs(newTabs);
+    setShowCookieWarning(false);
   };
 
   const switchTab = (id: string) => {
@@ -120,6 +149,7 @@ const Index = () => {
     const activeTab = updatedTabs.find(t => t.id === id);
     setCurrentUrl(activeTab?.url || '');
     setSearchQuery(activeTab?.title || '');
+    setShowCookieWarning(!!activeTab?.url);
   };
 
   const openFromHistory = (item: HistoryItem) => {
@@ -150,6 +180,64 @@ const Index = () => {
     if (hours < 24) return `${hours} ч назад`;
     if (days < 7) return `${days} дн назад`;
     return date.toLocaleDateString('ru-RU');
+  };
+
+  const handleCalcButton = (value: string) => {
+    if (value === 'C') {
+      setCalcDisplay('0');
+      setCalcExpression('');
+    } else if (value === '=') {
+      try {
+        const result = eval(calcExpression || calcDisplay);
+        setCalcDisplay(result.toString());
+        setCalcExpression('');
+      } catch {
+        setCalcDisplay('Ошибка');
+        setCalcExpression('');
+      }
+    } else if (['+', '-', '*', '/'].includes(value)) {
+      setCalcExpression(calcDisplay + value);
+      setCalcDisplay('0');
+    } else {
+      if (calcDisplay === '0') {
+        setCalcDisplay(value);
+      } else {
+        setCalcDisplay(calcDisplay + value);
+      }
+    }
+  };
+
+  const scanWebsite = () => {
+    setIsScanning(true);
+    toast.info('Сканирование сайта...');
+    
+    setTimeout(() => {
+      setIsScanning(false);
+      const hasVirus = Math.random() > 0.7;
+      
+      if (hasVirus) {
+        toast.error('⚠️ Обнаружены потенциальные угрозы!', {
+          description: 'Рекомендуем покинуть этот сайт',
+          action: {
+            label: 'Выйти',
+            onClick: () => {
+              setCurrentUrl('');
+              setSearchQuery('');
+              const activeTabIndex = tabs.findIndex(t => t.isActive);
+              const updatedTabs = [...tabs];
+              updatedTabs[activeTabIndex] = {
+                ...updatedTabs[activeTabIndex],
+                url: '',
+                title: 'Новая вкладка'
+              };
+              setTabs(updatedTabs);
+            }
+          }
+        });
+      } else {
+        toast.success('✓ Сайт безопасен');
+      }
+    }, 2000);
   };
 
   return (
@@ -239,6 +327,30 @@ const Index = () => {
               </div>
             </form>
 
+            {currentUrl && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:bg-primary/10 transition-colors"
+                  >
+                    <Icon name="MoreVertical" size={20} className="text-primary" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setIsCalculatorOpen(true)}>
+                    <Icon name="Calculator" size={16} className="mr-2" />
+                    Калькулятор
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={scanWebsite} disabled={isScanning}>
+                    <Icon name="Shield" size={16} className="mr-2" />
+                    {isScanning ? 'Сканирование...' : 'Анализ на вирусы'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             <Button
               onClick={addNewTab}
               size="icon"
@@ -288,6 +400,26 @@ const Index = () => {
         </div>
 
         <div className="flex-1 relative">
+          {showCookieWarning && currentUrl && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md animate-fade-in">
+              <Alert className="bg-white/95 backdrop-blur shadow-xl border-2 border-primary/20">
+                <Icon name="Cookie" size={20} className="text-primary" />
+                <AlertDescription className="ml-6">
+                  <p className="font-medium mb-1">Этот сайт использует файлы cookie</p>
+                  <p className="text-xs text-muted-foreground">Продолжая просмотр, вы соглашаетесь с их использованием</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowCookieWarning(false)}
+                    className="mt-2 rounded-full"
+                  >
+                    Понятно
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
           {currentUrl ? (
             <div className="absolute inset-0 bg-white m-4 md:m-8 rounded-3xl shadow-2xl overflow-hidden">
               <iframe
@@ -303,43 +435,103 @@ const Index = () => {
                 <div className="mb-8">
                   <Icon name="Compass" size={80} className="mx-auto text-white/90 mb-6" />
                   <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
-                    Modern Browser
+                    HimoBrowser@admin.com
                   </h1>
                   <p className="text-lg md:text-xl text-white/80">
                     Введите адрес сайта или поисковый запрос выше
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-12">
-                  <Card className="p-6 bg-white/95 backdrop-blur hover:shadow-xl transition-shadow cursor-pointer group">
-                    <Icon name="Zap" size={32} className="mx-auto mb-3 text-primary group-hover:scale-110 transition-transform" />
-                    <h3 className="font-semibold mb-2">Быстрый поиск</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Мгновенный доступ к любым сайтам
-                    </p>
-                  </Card>
-
-                  <Card className="p-6 bg-white/95 backdrop-blur hover:shadow-xl transition-shadow cursor-pointer group">
-                    <Icon name="History" size={32} className="mx-auto mb-3 text-secondary group-hover:scale-110 transition-transform" />
-                    <h3 className="font-semibold mb-2">История</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Сохраняем всё что вы посещали
-                    </p>
-                  </Card>
-
-                  <Card className="p-6 bg-white/95 backdrop-blur hover:shadow-xl transition-shadow cursor-pointer group">
-                    <Icon name="Layers" size={32} className="mx-auto mb-3 text-accent group-hover:scale-110 transition-transform" />
-                    <h3 className="font-semibold mb-2">Вкладки</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Удобное управление вкладками
-                    </p>
-                  </Card>
-                </div>
+                <Card className="p-8 bg-white/95 backdrop-blur hover:shadow-xl transition-shadow max-w-md mx-auto">
+                  <Icon name="Calculator" size={48} className="mx-auto mb-4 text-primary" />
+                  <h3 className="font-semibold text-xl mb-2">Калькулятор</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Быстрые вычисления прямо в браузере
+                  </p>
+                  <Button
+                    onClick={() => setIsCalculatorOpen(true)}
+                    className="w-full rounded-full bg-gradient-to-r from-primary to-secondary"
+                  >
+                    Открыть калькулятор
+                  </Button>
+                  <div className="mt-6 pt-4 border-t">
+                    <a
+                      href="https://t.me/HimoBrowses"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 text-sm text-primary hover:text-secondary transition-colors"
+                    >
+                      <Icon name="Radio" size={16} />
+                      Новости браузера
+                    </a>
+                  </div>
+                </Card>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      <Dialog open={isCalculatorOpen} onOpenChange={setIsCalculatorOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">Калькулятор</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-4 rounded-2xl">
+              <div className="text-right text-3xl font-bold text-primary min-h-[50px] flex items-center justify-end">
+                {calcDisplay}
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {['7', '8', '9', '/'].map(btn => (
+                <Button
+                  key={btn}
+                  onClick={() => handleCalcButton(btn)}
+                  variant="outline"
+                  className="h-14 text-lg rounded-xl hover:bg-primary/10"
+                >
+                  {btn}
+                </Button>
+              ))}
+              {['4', '5', '6', '*'].map(btn => (
+                <Button
+                  key={btn}
+                  onClick={() => handleCalcButton(btn)}
+                  variant="outline"
+                  className="h-14 text-lg rounded-xl hover:bg-primary/10"
+                >
+                  {btn}
+                </Button>
+              ))}
+              {['1', '2', '3', '-'].map(btn => (
+                <Button
+                  key={btn}
+                  onClick={() => handleCalcButton(btn)}
+                  variant="outline"
+                  className="h-14 text-lg rounded-xl hover:bg-primary/10"
+                >
+                  {btn}
+                </Button>
+              ))}
+              {['C', '0', '=', '+'].map(btn => (
+                <Button
+                  key={btn}
+                  onClick={() => handleCalcButton(btn)}
+                  variant={btn === '=' ? 'default' : 'outline'}
+                  className={`h-14 text-lg rounded-xl ${
+                    btn === '=' 
+                      ? 'bg-gradient-to-r from-primary to-secondary text-white' 
+                      : 'hover:bg-primary/10'
+                  }`}
+                >
+                  {btn}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
