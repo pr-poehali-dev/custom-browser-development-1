@@ -47,6 +47,7 @@ const Index = () => {
   const [calcExpression, setCalcExpression] = useState('');
   const [showCookieWarning, setShowCookieWarning] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isDesktopMode, setIsDesktopMode] = useState(false);
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('browser-history');
@@ -92,7 +93,7 @@ const Index = () => {
       if (url.includes('.') && !url.includes(' ')) {
         url = 'https://' + url;
       } else {
-        url = 'https://yandex.ru/search/?text=' + encodeURIComponent(url);
+        url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
       }
     }
 
@@ -347,6 +348,10 @@ const Index = () => {
                     <Icon name="Shield" size={16} className="mr-2" />
                     {isScanning ? 'Сканирование...' : 'Анализ на вирусы'}
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsDesktopMode(!isDesktopMode)}>
+                    <Icon name="Monitor" size={16} className="mr-2" />
+                    {isDesktopMode ? 'Мобильная версия' : 'Версия для ПК'}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -421,28 +426,29 @@ const Index = () => {
           )}
 
           {currentUrl ? (
-            <div className="absolute inset-0 bg-white m-4 md:m-8 rounded-3xl shadow-2xl overflow-hidden">
+            <div className="absolute inset-0 bg-white m-2 md:m-8 rounded-2xl md:rounded-3xl shadow-2xl overflow-hidden">
               <iframe
                 src={currentUrl}
                 className="w-full h-full"
                 title="Browser content"
                 sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                style={isDesktopMode ? { width: '200%', height: '200%', transform: 'scale(0.5)', transformOrigin: '0 0' } : undefined}
               />
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full px-4">
-              <div className="text-center max-w-2xl animate-fade-in">
-                <div className="mb-8">
-                  <Icon name="Compass" size={80} className="mx-auto text-white/90 mb-6" />
-                  <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
+            <div className="flex items-center justify-center h-full px-4 py-8">
+              <div className="text-center max-w-2xl animate-fade-in w-full">
+                <div className="mb-6 md:mb-8">
+                  <Icon name="Compass" size={64} className="mx-auto text-white/90 mb-4 md:mb-6 md:w-20 md:h-20" />
+                  <h1 className="text-2xl sm:text-3xl md:text-6xl font-bold text-white mb-3 md:mb-4 px-2">
                     HimoBrowser@admin.com
                   </h1>
-                  <p className="text-lg md:text-xl text-white/80">
+                  <p className="text-base md:text-xl text-white/80 px-4">
                     Введите адрес сайта или поисковый запрос выше
                   </p>
                 </div>
 
-                <Card className="p-8 bg-white/95 backdrop-blur hover:shadow-xl transition-shadow max-w-md mx-auto">
+                <Card className="p-6 md:p-8 bg-white/95 backdrop-blur hover:shadow-xl transition-shadow max-w-md mx-auto">
                   <Icon name="Calculator" size={48} className="mx-auto mb-4 text-primary" />
                   <h3 className="font-semibold text-xl mb-2">Калькулятор</h3>
                   <p className="text-sm text-muted-foreground mb-4">
